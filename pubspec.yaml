@@ -1,0 +1,72 @@
+name: expense_ledger
+description: "Personal Expense Ledger - Track income, expenses & transfers"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # Database
+  sqflite: ^2.4.2
+  path: ^1.9.1
+
+  # State Management
+  provider: ^6.1.4
+
+  # Charts
+  fl_chart: ^0.70.2
+
+  # Date & Formatting
+  intl: ^0.20.2
+
+  # Export
+  csv: ^8.0.0
+  pdf: ^3.12.0
+  printing: ^5.14.2
+
+  # File System
+  path_provider: ^2.1.6
+
+  # Settings / Preferences
+  shared_preferences: ^2.5.3
+
+  # Biometric Auth
+  local_auth: ^2.3.0
+
+  # Icons
+  flutter_iconpicker: ^3.6.0
+
+  # UUID
+  uuid: ^4.5.1
+
+  # Google Fonts
+  google_fonts: ^6.2.1
+  share_plus: ^13.1.0
+  home_widget: ^0.9.3
+  notification_listener_service: ^1.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter:
+  uses-material-design: true
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/app_icon.jpg"
+  adaptive_icon_background: "#ffffff"
+  adaptive_icon_foreground: "assets/app_icon.jpg"
+
+dependency_overrides:
+  win32: ^6.0.0
+  dcli: ^9.0.0

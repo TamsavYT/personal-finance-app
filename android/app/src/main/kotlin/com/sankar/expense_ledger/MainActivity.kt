@@ -1,0 +1,5 @@
+package com.sankar.expense_ledger
+
+import io.flutter.embedding.android.FlutterFragmentActivity
+
+class MainActivity : FlutterFragmentActivity()
