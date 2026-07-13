@@ -38,6 +38,17 @@ class AuthProvider extends ChangeNotifier {
       _isPinEnabled = prefs.getBool('pin_enabled') ?? false;
       _isBiometricEnabled = prefs.getBool('biometric_enabled') ?? false;
       _pinHash = prefs.getString('pin_hash');
+
+      // Migrate PINs stored under the old plaintext key by an earlier build.
+      if (_pinHash == null) {
+        final legacyPin = prefs.getString('pin_code');
+        if (legacyPin != null) {
+          _pinHash = _hashPin(legacyPin);
+          await prefs.setString('pin_hash', _pinHash!);
+          await prefs.remove('pin_code');
+        }
+      }
+
       _failedAttempts = prefs.getInt('pin_failed_attempts') ?? 0;
       final lockedUntilMs = prefs.getInt('pin_locked_until');
       _lockedUntil = lockedUntilMs != null

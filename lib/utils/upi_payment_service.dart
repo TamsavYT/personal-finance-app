@@ -60,6 +60,12 @@ class UpiPaymentService {
       MethodChannel('com.sankar.expense_ledger/upi');
   static const Duration _reconcileWindow = Duration(minutes: 3);
   static const double _amountTolerance = 0.5; // rupees, rounding slack in notification text
+  // Bounds the wait for the Activity-result callback. The Android side can
+  // lose the pending callback for good if MainActivity is process-killed
+  // while the UPI app is foregrounded - without this the "Waiting for UPI
+  // app..." spinner would hang forever. Long enough that a normal payment
+  // (user unlocks GPay, enters their PIN) always finishes well within it.
+  static const Duration _resultTimeout = Duration(minutes: 2);
 
   final List<_PendingUpiPayment> _pending = [];
   final List<_PendingUpiPayment> _recentlyCompleted = [];
@@ -114,8 +120,12 @@ class UpiPaymentService {
     );
 
     Map<dynamic, dynamic>? raw;
+    bool timedOut = false;
     try {
-      raw = await _channel.invokeMapMethod<dynamic, dynamic>('pay', {'uri': uri});
+      raw = await _channel
+          .invokeMapMethod<dynamic, dynamic>('pay', {'uri': uri})
+          .timeout(_resultTimeout, onTimeout: () => null);
+      if (raw == null) timedOut = true;
     } on PlatformException catch (e) {
       if (e.code == 'NO_UPI_APP') {
         throw UpiAppNotFoundException();
@@ -123,9 +133,12 @@ class UpiPaymentService {
       rethrow;
     }
 
-    final resultCode = raw?['resultCode'] as int? ?? 0;
-    final response = raw?['response'] as String?;
-    final result = UpiPaymentResult.parse(resultCode: resultCode, response: response);
+    final result = timedOut
+        ? const UpiPaymentResult(status: UpiPaymentStatus.pending)
+        : UpiPaymentResult.parse(
+            resultCode: raw?['resultCode'] as int? ?? 0,
+            response: raw?['response'] as String?,
+          );
 
     switch (result.status) {
       case UpiPaymentStatus.success:
@@ -173,12 +186,22 @@ class UpiPaymentService {
   Future<bool> tryReconcile(double notifiedAmount) async {
     _sweepExpired();
 
-    final match = _pending
+    final candidates = _pending
         .where((p) => (p.amount - notifiedAmount).abs() <= _amountTolerance)
         .toList();
-    if (match.isEmpty) return false;
+    if (candidates.isEmpty) return false;
 
-    final p = match.first;
+    // With multiple ambiguous payments of a similar amount in flight, prefer
+    // the exact amount match, then the oldest payment - the bank/PSP
+    // notification for an earlier payment is expected to land first.
+    candidates.sort((a, b) {
+      final exactA = a.amount == notifiedAmount ? 0 : 1;
+      final exactB = b.amount == notifiedAmount ? 0 : 1;
+      if (exactA != exactB) return exactA - exactB;
+      return a.createdAt.compareTo(b.createdAt);
+    });
+
+    final p = candidates.first;
     _pending.remove(p);
     await _commit(p);
     _recentlyCompleted.add(p);

@@ -133,6 +133,13 @@ class TransactionProvider extends ChangeNotifier {
   Future<int> importTransactions(List<TransactionRecord> transactions) async {
     try {
       final count = await _db.insertTransactions(transactions);
+      if (transactions.isNotEmpty) {
+        // Jump the view to the most recent imported transaction's month -
+        // otherwise a historical import lands outside the current month
+        // filter and looks like it silently did nothing.
+        final latest = transactions.map((t) => t.date).reduce((a, b) => a.isAfter(b) ? a : b);
+        _selectedMonth = DateTime(latest.year, latest.month);
+      }
       await loadTransactions();
       return count;
     } catch (e) {

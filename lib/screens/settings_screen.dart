@@ -241,8 +241,8 @@ class SettingsScreen extends StatelessWidget {
     return Consumer2<BudgetProvider, CategoryProvider>(
       builder: (context, budgetProvider, catProvider, child) {
         // Load budgets if not loaded (deferred to avoid mutating state during build)
-        if (budgetProvider.budgets.isEmpty && !budgetProvider.isLoading) {
-          final now = DateTime.now();
+        final now = DateTime.now();
+        if (!budgetProvider.hasLoadedFor(now.month, now.year) && !budgetProvider.isLoading) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             budgetProvider.loadBudgets(now.month, now.year);
           });

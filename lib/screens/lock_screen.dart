@@ -134,7 +134,12 @@ class _LockScreenState extends State<LockScreen> {
                 ),
                 const SizedBox(height: 16),
                 if (_hasError)
-                  const Text('Incorrect PIN', style: TextStyle(color: Colors.red)),
+                  Text(
+                    auth.isLockedOut
+                        ? 'Too many attempts. Try again in ${auth.lockedUntil!.difference(DateTime.now()).inSeconds + 1}s'
+                        : 'Incorrect PIN',
+                    style: const TextStyle(color: Colors.red),
+                  ),
                 const SizedBox(height: 48),
                 _buildKeypad(),
                 const SizedBox(height: 24),

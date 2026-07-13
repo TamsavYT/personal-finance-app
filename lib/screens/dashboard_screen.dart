@@ -160,7 +160,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 itemBuilder: (context, index) {
                   final account = accProvider.accounts[index];
                   return FutureBuilder<double>(
-                    future: _accountBalanceFutures[account.id!],
+                    future: _accountBalanceFutures.putIfAbsent(
+                      account.id!,
+                      () => accProvider.getAccountBalance(account.id!),
+                    ),
                     builder: (context, snapshot) {
                       return AccountCard(
                         account: account,

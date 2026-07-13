@@ -5,9 +5,16 @@ import '../models/budget.dart';
 class BudgetProvider extends ChangeNotifier {
   List<Budget> _budgets = [];
   bool _isLoading = false;
+  int? _loadedMonth;
+  int? _loadedYear;
 
   List<Budget> get budgets => _budgets;
   bool get isLoading => _isLoading;
+
+  /// True once loadBudgets has completed for this month/year, even if the
+  /// result was empty - lets callers avoid re-triggering a load from build().
+  bool hasLoadedFor(int month, int year) =>
+      _loadedMonth == month && _loadedYear == year;
 
   final DatabaseHelper _db = DatabaseHelper.instance;
 
@@ -17,6 +24,8 @@ class BudgetProvider extends ChangeNotifier {
       notifyListeners();
 
       _budgets = await _db.getBudgetsByMonthYear(month, year);
+      _loadedMonth = month;
+      _loadedYear = year;
     } catch (e) {
       debugPrint('Error loading budgets: $e');
     } finally {

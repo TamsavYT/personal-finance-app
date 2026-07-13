@@ -19,8 +19,10 @@ class NotificationService {
   static const String _prefKey = 'auto_track_notifications';
   static const Duration _dedupWindow = Duration(seconds: 30);
 
-  String? _lastProcessedKey;
-  DateTime? _lastProcessedAt;
+  // Notifications processed in the last _dedupWindow, keyed by package+text.
+  // A map (not a single last-key) so two distinct notifications sharing the
+  // window don't clobber each other's dedup state.
+  final Map<String, DateTime> _recentlyProcessed = {};
 
   Future<bool> get isAutoTrackingEnabled async {
     final prefs = await SharedPreferences.getInstance();
@@ -87,16 +89,18 @@ class NotificationService {
           textToParse.toLowerCase().contains('sent') ||
           textToParse.toLowerCase().contains('debited')) {
 
-        final dedupKey = '$packageName|$textToParse';
+        // Key on the OS notification's own id+postTime, not the parsed text -
+        // two distinct real payments (e.g. splitting a bill) can render
+        // identical notification text within the window and must not be
+        // treated as the same event.
+        final dedupKey = '$packageName|${event.id}|${event.timestamp}';
         final now = DateTime.now();
-        if (_lastProcessedKey == dedupKey &&
-            _lastProcessedAt != null &&
-            now.difference(_lastProcessedAt!) < _dedupWindow) {
+        _recentlyProcessed.removeWhere((_, at) => now.difference(at) > _dedupWindow);
+        if (_recentlyProcessed.containsKey(dedupKey)) {
           log('Duplicate notification ignored: $dedupKey');
           return;
         }
-        _lastProcessedKey = dedupKey;
-        _lastProcessedAt = now;
+        _recentlyProcessed[dedupKey] = now;
 
         _parseAndSaveExpense(textToParse);
       }

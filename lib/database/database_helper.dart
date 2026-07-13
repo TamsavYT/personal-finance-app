@@ -417,8 +417,8 @@ class DatabaseHelper {
     final db = await database;
     return await db.delete(
       tableTransactions,
-      where: 'account_id = ?',
-      whereArgs: [accountId],
+      where: 'account_id = ? OR to_account_id = ?',
+      whereArgs: [accountId, accountId],
     );
   }
 

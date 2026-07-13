@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:provider/provider.dart';
 import '../providers/transaction_provider.dart';
 import '../providers/category_provider.dart';
@@ -611,6 +612,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('No UPI app found on this device.')));
+    } on PlatformException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Payment could not be started: ${e.message ?? e.code}')));
     } finally {
       if (mounted) setState(() => _isPayingViaUpi = false);
     }
