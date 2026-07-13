@@ -165,4 +165,86 @@ class ExportHelper {
 
     return filePath;
   }
+
+  /// Parses a CSV file (in the same format produced by [exportToCsv]) into
+  /// [TransactionRecord]s. Category and account names are resolved to IDs
+  /// via [categories] and [accounts]; rows referencing an unknown category
+  /// or account name are skipped and reported in [ImportResult.skipped].
+  static Future<ImportResult> importFromCsv(
+    String filePath,
+    List<Category> categories,
+    List<Account> accounts,
+  ) async {
+    final file = File(filePath);
+    final content = await file.readAsString();
+    final rows = Csv(lineDelimiter: '\n').decode(content);
+
+    if (rows.isEmpty) {
+      return ImportResult(transactions: [], skipped: 0, total: 0);
+    }
+
+    final categoryMap = {for (final c in categories) c.name: c.id};
+    final accountMap = {for (final a in accounts) a.name: a.id};
+    final dateFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
+
+    final transactions = <TransactionRecord>[];
+    int skipped = 0;
+
+    // Skip header row.
+    for (final row in rows.skip(1)) {
+      if (row.length < 6) {
+        skipped++;
+        continue;
+      }
+
+      try {
+        final type = row[1].toString().trim();
+        final categoryId = categoryMap[row[2].toString().trim()];
+        final accountId = accountMap[row[3].toString().trim()];
+        final toAccountName = row[4].toString().trim();
+        final toAccountId =
+            toAccountName.isNotEmpty ? accountMap[toAccountName] : null;
+
+        if (categoryId == null || accountId == null) {
+          skipped++;
+          continue;
+        }
+
+        final now = DateTime.now();
+        transactions.add(TransactionRecord(
+          date: dateFormat.parse(row[0].toString().trim()),
+          type: type,
+          categoryId: categoryId,
+          accountId: accountId,
+          toAccountId: toAccountId,
+          amount: double.parse(row[5].toString().trim()),
+          note: row.length > 6 && row[6].toString().isNotEmpty
+              ? row[6].toString()
+              : null,
+          createdAt: now,
+        ));
+      } catch (_) {
+        skipped++;
+      }
+    }
+
+    return ImportResult(
+      transactions: transactions,
+      skipped: skipped,
+      total: rows.length - 1,
+    );
+  }
+}
+
+/// Result of parsing a CSV import file.
+class ImportResult {
+  final List<TransactionRecord> transactions;
+  final int skipped;
+  final int total;
+
+  const ImportResult({
+    required this.transactions,
+    required this.skipped,
+    required this.total,
+  });
 }

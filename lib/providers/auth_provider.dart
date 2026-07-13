@@ -1,21 +1,35 @@
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:local_auth/local_auth.dart';
 
 class AuthProvider extends ChangeNotifier {
+  static const int _maxAttempts = 5;
+  static const Duration _lockoutDuration = Duration(minutes: 1);
+
   bool _isLocked = false;
   bool _isPinEnabled = false;
   bool _isBiometricEnabled = false;
   bool _isAuthenticated = false;
-  String? _pin;
+  String? _pinHash;
+  int _failedAttempts = 0;
+  DateTime? _lockedUntil;
 
   bool get isLocked => _isLocked;
   bool get isPinEnabled => _isPinEnabled;
   bool get isBiometricEnabled => _isBiometricEnabled;
   bool get isAuthenticated => _isAuthenticated;
-  String? get pin => _pin;
+  DateTime? get lockedUntil => _lockedUntil;
+
+  bool get isLockedOut =>
+      _lockedUntil != null && DateTime.now().isBefore(_lockedUntil!);
 
   final LocalAuthentication _localAuth = LocalAuthentication();
+
+  String _hashPin(String pin) {
+    return sha256.convert(utf8.encode(pin)).toString();
+  }
 
   Future<void> loadSettings() async {
     try {
@@ -23,7 +37,12 @@ class AuthProvider extends ChangeNotifier {
 
       _isPinEnabled = prefs.getBool('pin_enabled') ?? false;
       _isBiometricEnabled = prefs.getBool('biometric_enabled') ?? false;
-      _pin = prefs.getString('pin_code');
+      _pinHash = prefs.getString('pin_hash');
+      _failedAttempts = prefs.getInt('pin_failed_attempts') ?? 0;
+      final lockedUntilMs = prefs.getInt('pin_locked_until');
+      _lockedUntil = lockedUntilMs != null
+          ? DateTime.fromMillisecondsSinceEpoch(lockedUntilMs)
+          : null;
       _isLocked = _isPinEnabled || _isBiometricEnabled;
 
       notifyListeners();
@@ -37,10 +56,10 @@ class AuthProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
 
       await prefs.setBool('pin_enabled', true);
-      await prefs.setString('pin_code', pin);
+      await prefs.setString('pin_hash', _hashPin(pin));
 
       _isPinEnabled = true;
-      _pin = pin;
+      _pinHash = _hashPin(pin);
 
       notifyListeners();
     } catch (e) {
@@ -53,10 +72,14 @@ class AuthProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
 
       await prefs.setBool('pin_enabled', false);
-      await prefs.remove('pin_code');
+      await prefs.remove('pin_hash');
+      await prefs.remove('pin_failed_attempts');
+      await prefs.remove('pin_locked_until');
 
       _isPinEnabled = false;
-      _pin = null;
+      _pinHash = null;
+      _failedAttempts = 0;
+      _lockedUntil = null;
 
       notifyListeners();
     } catch (e) {
@@ -94,12 +117,36 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> authenticateWithPin(String pin) async {
     try {
-      if (pin == _pin) {
+      if (isLockedOut) {
+        return false;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+
+      if (_hashPin(pin) == _pinHash) {
+        _failedAttempts = 0;
+        _lockedUntil = null;
+        await prefs.remove('pin_failed_attempts');
+        await prefs.remove('pin_locked_until');
+
         _isAuthenticated = true;
         _isLocked = false;
         notifyListeners();
         return true;
       }
+
+      _failedAttempts++;
+      await prefs.setInt('pin_failed_attempts', _failedAttempts);
+      if (_failedAttempts >= _maxAttempts) {
+        _lockedUntil = DateTime.now().add(_lockoutDuration);
+        _failedAttempts = 0;
+        await prefs.setInt(
+          'pin_locked_until',
+          _lockedUntil!.millisecondsSinceEpoch,
+        );
+        await prefs.setInt('pin_failed_attempts', 0);
+      }
+      notifyListeners();
       return false;
     } catch (e) {
       debugPrint('Error authenticating with PIN: $e');
@@ -147,13 +194,17 @@ class AuthProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('pin_enabled', false);
       await prefs.setBool('biometric_enabled', false);
-      await prefs.remove('pin_code');
+      await prefs.remove('pin_hash');
+      await prefs.remove('pin_failed_attempts');
+      await prefs.remove('pin_locked_until');
 
       _isPinEnabled = false;
       _isBiometricEnabled = false;
       _isAuthenticated = false;
       _isLocked = false;
-      _pin = null;
+      _pinHash = null;
+      _failedAttempts = 0;
+      _lockedUntil = null;
 
       notifyListeners();
     } catch (e) {

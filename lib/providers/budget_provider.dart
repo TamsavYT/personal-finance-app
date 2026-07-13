@@ -46,6 +46,8 @@ class BudgetProvider extends ChangeNotifier {
   Future<void> deleteBudget(int id) async {
     try {
       await _db.deleteBudget(id);
+      _budgets.removeWhere((budget) => budget.id == id);
+      notifyListeners();
     } catch (e) {
       debugPrint('Error deleting budget: $e');
     }

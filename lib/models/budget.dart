@@ -57,7 +57,7 @@ class Budget {
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is Budget && other.id == id;
+    return other is Budget && id != null && other.id == id;
   }
 
   @override

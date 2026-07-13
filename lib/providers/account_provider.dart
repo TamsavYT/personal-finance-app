@@ -63,13 +63,12 @@ class AccountProvider extends ChangeNotifier {
 
   Future<double> getTotalBalance() async {
     try {
-      double total = 0.0;
-      for (final account in _accounts) {
-        if (account.id != null) {
-          total += await _db.getAccountBalance(account.id!);
-        }
-      }
-      return total;
+      final balances = await Future.wait<double>(
+        _accounts
+            .where((account) => account.id != null)
+            .map((account) => _db.getAccountBalance(account.id!)),
+      );
+      return balances.fold<double>(0.0, (sum, balance) => sum + balance);
     } catch (e) {
       debugPrint('Error getting total balance: $e');
       return 0.0;

@@ -7,6 +7,7 @@ import '../providers/theme_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/transaction_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:file_picker/file_picker.dart';
 import '../utils/currency_formatter.dart';
 import '../utils/icon_helper.dart';
 import '../utils/export_helper.dart';
@@ -29,6 +30,12 @@ class SettingsScreen extends StatelessWidget {
           _buildCategoriesSection(context),
           const Divider(),
           _buildBudgetsSection(context),
+          const Divider(),
+          ListTile(
+            title: const Text('Recurring Transactions'),
+            leading: const Icon(Icons.repeat),
+            onTap: () => Navigator.pushNamed(context, '/recurring-transactions'),
+          ),
           const Divider(),
           _buildAutoTrackingSection(context),
           const Divider(),
@@ -233,10 +240,12 @@ class SettingsScreen extends StatelessWidget {
   Widget _buildBudgetsSection(BuildContext context) {
     return Consumer2<BudgetProvider, CategoryProvider>(
       builder: (context, budgetProvider, catProvider, child) {
-        // Load budgets if not loaded
-        if (budgetProvider.budgets.isEmpty) {
+        // Load budgets if not loaded (deferred to avoid mutating state during build)
+        if (budgetProvider.budgets.isEmpty && !budgetProvider.isLoading) {
           final now = DateTime.now();
-          budgetProvider.loadBudgets(now.month, now.year);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            budgetProvider.loadBudgets(now.month, now.year);
+          });
         }
 
         return ExpansionTile(
@@ -437,7 +446,9 @@ class SettingsScreen extends StatelessWidget {
                 await Share.shareXFiles(
                   [XFile(path)],
                   text: 'Expense Ledger CSV Export',
-                  sharePositionOrigin: box!.localToGlobal(Offset.zero) & box.size,
+                  sharePositionOrigin: box != null
+                      ? box.localToGlobal(Offset.zero) & box.size
+                      : null,
                 );
               }
             } catch (e) {
@@ -468,13 +479,79 @@ class SettingsScreen extends StatelessWidget {
                 await Share.shareXFiles(
                   [XFile(path)],
                   text: 'Expense Ledger PDF Report',
-                  sharePositionOrigin: box!.localToGlobal(Offset.zero) & box.size,
+                  sharePositionOrigin: box != null
+                      ? box.localToGlobal(Offset.zero) & box.size
+                      : null,
                 );
               }
             } catch (e) {
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Failed to export PDF: $e')),
+                );
+              }
+            }
+          },
+        ),
+        ListTile(
+          title: const Text('Import Data from CSV'),
+          leading: const Icon(Icons.upload_file),
+          onTap: () async {
+            final txProvider = context.read<TransactionProvider>();
+            final catProvider = context.read<CategoryProvider>();
+            final accProvider = context.read<AccountProvider>();
+
+            try {
+              final result = await FilePicker.pickFiles(
+                type: FileType.custom,
+                allowedExtensions: ['csv'],
+              );
+              final pickedPath = result?.files.single.path;
+              if (pickedPath == null) return;
+
+              final parsed = await ExportHelper.importFromCsv(
+                pickedPath,
+                catProvider.categories,
+                accProvider.accounts,
+              );
+
+              if (parsed.transactions.isEmpty) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('No valid rows found (${parsed.skipped} skipped)')),
+                  );
+                }
+                return;
+              }
+
+              if (!context.mounted) return;
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Import Transactions?'),
+                  content: Text(
+                    '${parsed.transactions.length} of ${parsed.total} rows will be imported.'
+                    '${parsed.skipped > 0 ? ' ${parsed.skipped} skipped (unknown category/account or bad format).' : ''}',
+                  ),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('CANCEL')),
+                    ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('IMPORT')),
+                  ],
+                ),
+              );
+
+              if (confirmed == true) {
+                final count = await txProvider.importTransactions(parsed.transactions);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Imported $count transactions')),
+                  );
+                }
+              }
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to import: $e')),
                 );
               }
             }

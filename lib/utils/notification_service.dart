@@ -4,6 +4,7 @@ import 'package:notification_listener_service/notification_listener_service.dart
 import 'package:shared_preferences/shared_preferences.dart';
 import '../database/database_helper.dart';
 import '../models/transaction.dart';
+import 'upi_payment_service.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -16,6 +17,10 @@ class NotificationService {
 
   bool _isListening = false;
   static const String _prefKey = 'auto_track_notifications';
+  static const Duration _dedupWindow = Duration(seconds: 30);
+
+  String? _lastProcessedKey;
+  DateTime? _lastProcessedAt;
 
   Future<bool> get isAutoTrackingEnabled async {
     final prefs = await SharedPreferences.getInstance();
@@ -78,10 +83,21 @@ class NotificationService {
       final textToParse = '$title $content';
       
       // Simple check to ensure it's a payment/debit notification
-      if (textToParse.toLowerCase().contains('paid') || 
-          textToParse.toLowerCase().contains('sent') || 
+      if (textToParse.toLowerCase().contains('paid') ||
+          textToParse.toLowerCase().contains('sent') ||
           textToParse.toLowerCase().contains('debited')) {
-        
+
+        final dedupKey = '$packageName|$textToParse';
+        final now = DateTime.now();
+        if (_lastProcessedKey == dedupKey &&
+            _lastProcessedAt != null &&
+            now.difference(_lastProcessedAt!) < _dedupWindow) {
+          log('Duplicate notification ignored: $dedupKey');
+          return;
+        }
+        _lastProcessedKey = dedupKey;
+        _lastProcessedAt = now;
+
         _parseAndSaveExpense(textToParse);
       }
     }
@@ -91,13 +107,28 @@ class NotificationService {
     // Try to find amount: Rs. 100, ₹100, INR 100
     final amountRegex = RegExp(r'(?:Rs\.?|INR|₹)\s?(\d+(?:,\d+)*(?:\.\d+)?)', caseSensitive: false);
     final match = amountRegex.firstMatch(text);
-    
+
     if (match != null && match.groupCount >= 1) {
       final amountStr = match.group(1)?.replaceAll(',', '');
       if (amountStr != null) {
         final amount = double.tryParse(amountStr);
         if (amount != null && amount > 0) {
-          
+
+          // This notification may be the delayed confirmation of a payment
+          // started from our own UPI screen (see UpiPaymentService) - GPay/
+          // PhonePe often don't report success back through the app-switch
+          // callback for P2P transfers, so this is the fallback that
+          // actually logs it.
+          final upiService = UpiPaymentService.instance;
+          if (await upiService.tryReconcile(amount)) {
+            log('Reconciled UPI payment via notification: $amount');
+            return;
+          }
+          if (upiService.wasAlreadyLogged(amount)) {
+            log('Notification amount already logged via UPI callback, skipping: $amount');
+            return;
+          }
+
           // Get database helper
           final db = DatabaseHelper.instance;
           

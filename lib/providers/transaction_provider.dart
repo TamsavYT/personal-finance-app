@@ -23,34 +23,23 @@ class TransactionProvider extends ChangeNotifier {
   final DatabaseHelper _db = DatabaseHelper.instance;
 
   List<TransactionRecord> get filteredTransactions {
-    List<TransactionRecord> filtered = List.from(_transactions);
+    final query = _searchQuery.toLowerCase();
 
-    if (_filterType != 'all') {
-      filtered = filtered.where((t) => t.type == _filterType).toList();
-    }
-
-    if (_filterAccountId != null) {
-      filtered = filtered
-          .where((t) => t.accountId == _filterAccountId)
-          .toList();
-    }
-
-    if (_filterCategoryId != null) {
-      filtered = filtered
-          .where((t) => t.categoryId == _filterCategoryId)
-          .toList();
-    }
-
-    if (_searchQuery.isNotEmpty) {
-      final query = _searchQuery.toLowerCase();
-      filtered = filtered.where((t) {
+    return _transactions.where((t) {
+      if (_filterType != 'all' && t.type != _filterType) return false;
+      if (_filterAccountId != null && t.accountId != _filterAccountId) {
+        return false;
+      }
+      if (_filterCategoryId != null && t.categoryId != _filterCategoryId) {
+        return false;
+      }
+      if (query.isNotEmpty) {
         final noteMatch = t.note?.toLowerCase().contains(query) ?? false;
         final amountMatch = t.amount.toString().contains(query);
-        return noteMatch || amountMatch;
-      }).toList();
-    }
-
-    return filtered;
+        if (!noteMatch && !amountMatch) return false;
+      }
+      return true;
+    }).toList();
   }
 
   double get monthlyIncome {
@@ -138,6 +127,17 @@ class TransactionProvider extends ChangeNotifier {
       await loadTransactions();
     } catch (e) {
       debugPrint('Error clearing transactions for account: $e');
+    }
+  }
+
+  Future<int> importTransactions(List<TransactionRecord> transactions) async {
+    try {
+      final count = await _db.insertTransactions(transactions);
+      await loadTransactions();
+      return count;
+    } catch (e) {
+      debugPrint('Error importing transactions: $e');
+      return 0;
     }
   }
 

@@ -7,6 +7,8 @@ import '../widgets/balance_card.dart';
 import '../widgets/account_card.dart';
 import '../widgets/transaction_tile.dart';
 import '../widgets/empty_state.dart';
+import 'qr_scan_screen.dart';
+import '../models/upi_qr_prefill.dart';
 
 class DashboardScreen extends StatefulWidget {
   final VoidCallback? onSeeAll;
@@ -17,14 +19,30 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  Future<double>? _totalBalanceFuture;
+  final Map<int, Future<double>> _accountBalanceFutures = {};
+
   @override
   void initState() {
     super.initState();
     // Load data after the first frame
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AccountProvider>().loadAccounts();
-      context.read<CategoryProvider>().loadCategories();
-      context.read<TransactionProvider>().loadTransactions();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await context.read<AccountProvider>().loadAccounts();
+      await context.read<CategoryProvider>().loadCategories();
+      await context.read<TransactionProvider>().loadTransactions();
+      if (mounted) _refreshBalances();
+    });
+  }
+
+  void _refreshBalances() {
+    final accProvider = context.read<AccountProvider>();
+    setState(() {
+      _totalBalanceFuture = accProvider.getTotalBalance();
+      _accountBalanceFutures.clear();
+      for (final account in accProvider.accounts) {
+        _accountBalanceFutures[account.id!] =
+            accProvider.getAccountBalance(account.id!);
+      }
     });
   }
 
@@ -32,6 +50,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await context.read<AccountProvider>().loadAccounts();
     await context.read<CategoryProvider>().loadCategories();
     await context.read<TransactionProvider>().loadTransactions();
+    _refreshBalances();
+  }
+
+  Future<void> _scanUpiQr() async {
+    final prefill = await Navigator.of(context).push<UpiQrPrefill>(
+      MaterialPageRoute(builder: (_) => const QrScanScreen()),
+    );
+    if (prefill == null || !mounted) return;
+
+    final hasUpiAccount = context.read<AccountProvider>().accounts.any((a) => a.type == 'upi');
+    if (!hasUpiAccount) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('No UPI account set up yet - add one in Settings to pay directly. '
+            'Amount and payee have been prefilled for now.'),
+        duration: Duration(seconds: 5),
+      ));
+    }
+
+    if (!mounted) return;
+    await Navigator.pushNamed(context, '/add-transaction', arguments: prefill);
   }
 
   @override
@@ -46,6 +84,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildTopSection(),
+                _buildScanQrButton(),
                 _buildAccountsSection(),
                 _buildRecentTransactionsSection(),
               ],
@@ -60,7 +99,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Consumer2<TransactionProvider, AccountProvider>(
       builder: (context, txProvider, accProvider, child) {
         return FutureBuilder<double>(
-          future: accProvider.getTotalBalance(),
+          future: _totalBalanceFuture,
           builder: (context, snapshot) {
             double totalBalance = snapshot.data ?? 0;
             return BalanceCard(
@@ -80,6 +119,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
           },
         );
       },
+    );
+  }
+
+  Widget _buildScanQrButton() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: OutlinedButton.icon(
+        onPressed: _scanUpiQr,
+        icon: const Icon(Icons.qr_code_scanner),
+        label: const Text('Scan UPI QR to Pay'),
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+        ),
+      ),
     );
   }
 
@@ -107,7 +160,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 itemBuilder: (context, index) {
                   final account = accProvider.accounts[index];
                   return FutureBuilder<double>(
-                    future: accProvider.getAccountBalance(account.id!),
+                    future: _accountBalanceFutures[account.id!],
                     builder: (context, snapshot) {
                       return AccountCard(
                         account: account,

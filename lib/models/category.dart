@@ -69,7 +69,7 @@ class Category {
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is Category && other.id == id;
+    return other is Category && id != null && other.id == id;
   }
 
   @override

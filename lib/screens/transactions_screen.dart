@@ -45,6 +45,35 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
               )
             : const Text('Transactions'),
         actions: [
+          Consumer<CategoryProvider>(
+            builder: (context, catProvider, child) {
+              return PopupMenuButton<int?>(
+                icon: Icon(
+                  Icons.filter_list,
+                  color: context.watch<TransactionProvider>().filterCategoryId != null
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
+                ),
+                tooltip: 'Filter by category',
+                onSelected: (categoryId) {
+                  context.read<TransactionProvider>().setFilterCategory(categoryId);
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem<int?>(
+                    value: null,
+                    child: Text('All categories'),
+                  ),
+                  const PopupMenuDivider(),
+                  ...catProvider.categories.map(
+                    (c) => PopupMenuItem<int?>(
+                      value: c.id,
+                      child: Text(c.name),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
           IconButton(
             icon: Icon(_isSearching ? Icons.close : Icons.search),
             onPressed: () {
@@ -67,6 +96,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
             children: [
               _buildMonthSelector(context, txProvider),
               _buildFilterChips(txProvider),
+              if (txProvider.filterCategoryId != null)
+                _buildCategoryFilterBanner(txProvider, catProvider),
               Expanded(
                 child: txProvider.filteredTransactions.isEmpty
                     ? const EmptyState(
@@ -148,6 +179,17 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           txProvider.setFilterType(value);
         }
       },
+    );
+  }
+
+  Widget _buildCategoryFilterBanner(TransactionProvider txProvider, CategoryProvider catProvider) {
+    final category = catProvider.getCategoryById(txProvider.filterCategoryId!);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+      child: InputChip(
+        label: Text('Category: ${category?.name ?? 'Unknown'}'),
+        onDeleted: () => txProvider.setFilterCategory(null),
+      ),
     );
   }
 

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/analytics_provider.dart';
 import '../utils/currency_formatter.dart';
 import '../utils/date_formatter.dart';
+import '../utils/color_helper.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../utils/icon_helper.dart';
 
@@ -179,7 +180,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   centerSpaceRadius: 60,
                   sections: analytics.categoryExpenses.map((data) {
                     final colorHex = data['color'] as String;
-                    final color = Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
+                    final color = ColorHelper.hexToColor(colorHex);
                     return PieChartSectionData(
                       color: color,
                       value: (data['total'] as num).toDouble(),
@@ -193,9 +194,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             const SizedBox(height: 24),
             ...analytics.categoryExpenses.map((data) {
               final colorHex = data['color'] as String;
-              final color = Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
+              final color = ColorHelper.hexToColor(colorHex);
               final amount = (data['total'] as num).toDouble();
-              final percentage = (amount / analytics.totalExpense) * 100;
+              final percentage = analytics.totalExpense > 0
+                  ? (amount / analytics.totalExpense) * 100
+                  : 0.0;
               
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8.0),

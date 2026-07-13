@@ -30,6 +30,9 @@ dependencies:
   pdf: ^3.12.0
   printing: ^5.14.2
 
+  # Import
+  file_picker: ^12.0.0-beta.7
+
   # File System
   path_provider: ^2.1.6
 
@@ -39,8 +42,8 @@ dependencies:
   # Biometric Auth
   local_auth: ^2.3.0
 
-  # Icons
-  flutter_iconpicker: ^3.6.0
+  # Hashing (PIN storage)
+  crypto: ^3.0.3
 
   # UUID
   uuid: ^4.5.1
@@ -50,6 +53,9 @@ dependencies:
   share_plus: ^13.1.0
   home_widget: ^0.9.3
   notification_listener_service: ^1.0.0
+
+  # QR Scanning (UPI Pay-to-QR)
+  mobile_scanner: ^6.0.2
 
 dev_dependencies:
   flutter_test:
@@ -66,7 +72,3 @@ flutter_launcher_icons:
   image_path: "assets/app_icon.jpg"
   adaptive_icon_background: "#ffffff"
   adaptive_icon_foreground: "assets/app_icon.jpg"
-
-dependency_overrides:
-  win32: ^6.0.0
-  dcli: ^9.0.0

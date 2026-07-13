@@ -5,6 +5,7 @@ import '../models/account.dart';
 import '../utils/currency_formatter.dart';
 import '../utils/date_formatter.dart';
 import '../utils/icon_helper.dart';
+import '../utils/color_helper.dart';
 
 class TransactionTile extends StatelessWidget {
   final TransactionRecord transaction;
@@ -34,7 +35,7 @@ class TransactionTile extends StatelessWidget {
       iconColor = Colors.blue;
     } else if (category != null) {
       iconData = IconHelper.getIconFromCodePoint(int.parse(category!.icon));
-      iconColor = Color(int.parse(category!.color.replaceFirst('#', '0xFF')));
+      iconColor = ColorHelper.hexToColor(category!.color);
     }
 
     String title = category?.name ?? 'Transfer';

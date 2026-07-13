@@ -7,6 +7,7 @@ import 'providers/category_provider.dart';
 import 'providers/transaction_provider.dart';
 import 'providers/analytics_provider.dart';
 import 'providers/budget_provider.dart';
+import 'providers/recurring_transaction_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/auth_provider.dart';
 import 'screens/dashboard_screen.dart';
@@ -14,6 +15,7 @@ import 'screens/transactions_screen.dart';
 import 'screens/add_transaction_screen.dart';
 import 'screens/analytics_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/recurring_transactions_screen.dart';
 import 'screens/lock_screen.dart' show AuthWrapper, LockScreen;
 import 'package:home_widget/home_widget.dart';
 import 'utils/notification_service.dart';
@@ -29,6 +31,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => TransactionProvider()),
         ChangeNotifierProvider(create: (_) => AnalyticsProvider()),
         ChangeNotifierProvider(create: (_) => BudgetProvider()),
+        ChangeNotifierProvider(create: (_) => RecurringTransactionProvider()),
       ],
       child: const ExpenseLedgerApp(),
     ),
@@ -51,6 +54,7 @@ class ExpenseLedgerApp extends StatelessWidget {
           home: const AuthWrapper(child: MainNavigation()),
           routes: {
             '/add-transaction': (context) => const AddTransactionScreen(),
+            '/recurring-transactions': (context) => const RecurringTransactionsScreen(),
           },
         );
       },

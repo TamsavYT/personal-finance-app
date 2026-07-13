@@ -17,7 +17,7 @@ class DatabaseHelper {
   DatabaseHelper._internal();
 
   static const String _databaseName = 'expense_ledger.db';
-  static const int _databaseVersion = 2;
+  static const int _databaseVersion = 3;
 
   // Table names
   static const String tableAccounts = 'accounts';
@@ -52,15 +52,28 @@ class DatabaseHelper {
       // Add friend_name column
       await db.execute('ALTER TABLE $tableTransactions ADD COLUMN friend_name TEXT');
       // Insert Transfer category if not exists
-      final transferCategory = {
-        'name': 'Transfer',
-        'type': 'transfer',
-        'icon': '0xe5d5',
-        'color': '#1E88E5',
-        'is_default': 1,
-        'is_active': 1,
-      };
-      await db.insert(tableCategories, transferCategory);
+      final existing = await db.query(
+        tableCategories,
+        where: 'name = ? AND type = ?',
+        whereArgs: ['Transfer', 'transfer'],
+        limit: 1,
+      );
+      if (existing.isEmpty) {
+        final transferCategory = {
+          'name': 'Transfer',
+          'type': 'transfer',
+          'icon': '0xe5d5',
+          'color': '#1E88E5',
+          'is_default': 1,
+          'is_active': 1,
+        };
+        await db.insert(tableCategories, transferCategory);
+      }
+    }
+    if (oldVersion < 3) {
+      // Add UPI transaction reference columns
+      await db.execute('ALTER TABLE $tableTransactions ADD COLUMN txn_id TEXT');
+      await db.execute('ALTER TABLE $tableTransactions ADD COLUMN txn_ref TEXT');
     }
   }
 
@@ -107,6 +120,8 @@ class DatabaseHelper {
         created_at TEXT NOT NULL,
         is_recurring INTEGER NOT NULL DEFAULT 0,
         recurring_type TEXT,
+        txn_id TEXT,
+        txn_ref TEXT,
         FOREIGN KEY (category_id) REFERENCES $tableCategories (id) ON DELETE CASCADE,
         FOREIGN KEY (account_id) REFERENCES $tableAccounts (id) ON DELETE CASCADE,
         FOREIGN KEY (to_account_id) REFERENCES $tableAccounts (id) ON DELETE SET NULL
@@ -349,6 +364,19 @@ class DatabaseHelper {
         tableTransactions, transaction.toMap()..remove('id'));
   }
 
+  Future<int> insertTransactions(List<TransactionRecord> transactions) async {
+    final db = await database;
+    int count = 0;
+    await db.transaction((txn) async {
+      for (final transaction in transactions) {
+        await txn.insert(
+            tableTransactions, transaction.toMap()..remove('id'));
+        count++;
+      }
+    });
+    return count;
+  }
+
   Future<List<TransactionRecord>> getTransactions() async {
     final db = await database;
     final maps = await db.query(tableTransactions, orderBy: 'date DESC');
@@ -389,8 +417,8 @@ class DatabaseHelper {
     final db = await database;
     return await db.delete(
       tableTransactions,
-      where: 'account_id = ? OR to_account_id = ?',
-      whereArgs: [accountId, accountId],
+      where: 'account_id = ?',
+      whereArgs: [accountId],
     );
   }
 
@@ -639,30 +667,31 @@ class DatabaseHelper {
   /// Each map: {month, income, expense}
   Future<List<Map<String, dynamic>>> getMonthlyTrend(int year) async {
     final db = await database;
-    final List<Map<String, dynamic>> trend = [];
+    final startDate = DateTime(year, 1, 1).toIso8601String();
+    final endDate = DateTime(year, 12, 31, 23, 59, 59).toIso8601String();
 
-    for (int month = 1; month <= 12; month++) {
-      final startDate = DateTime(year, month, 1).toIso8601String();
-      final endDate =
-          DateTime(year, month + 1, 0, 23, 59, 59).toIso8601String();
+    final results = await db.rawQuery(
+      '''
+      SELECT
+        CAST(strftime('%m', date) AS INTEGER) as month,
+        type,
+        COALESCE(SUM(amount), 0.0) as total
+      FROM $tableTransactions
+      WHERE date >= ? AND date <= ? AND type IN ('income', 'expense')
+      GROUP BY month, type
+      ''',
+      [startDate, endDate],
+    );
 
-      final incomeResult = await db.rawQuery(
-        'SELECT COALESCE(SUM(amount), 0.0) as total FROM $tableTransactions '
-        'WHERE type = ? AND date >= ? AND date <= ?',
-        ['income', startDate, endDate],
-      );
+    final trend = List.generate(
+      12,
+      (i) => {'month': i + 1, 'income': 0.0, 'expense': 0.0},
+    );
 
-      final expenseResult = await db.rawQuery(
-        'SELECT COALESCE(SUM(amount), 0.0) as total FROM $tableTransactions '
-        'WHERE type = ? AND date >= ? AND date <= ?',
-        ['expense', startDate, endDate],
-      );
-
-      trend.add({
-        'month': month,
-        'income': (incomeResult.first['total'] as num).toDouble(),
-        'expense': (expenseResult.first['total'] as num).toDouble(),
-      });
+    for (final row in results) {
+      final month = row['month'] as int;
+      final type = row['type'] as String;
+      trend[month - 1][type] = (row['total'] as num).toDouble();
     }
 
     return trend;

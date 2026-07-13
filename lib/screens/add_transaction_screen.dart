@@ -7,7 +7,11 @@ import '../models/transaction.dart';
 import '../models/category.dart';
 import '../models/account.dart';
 import '../utils/icon_helper.dart';
+import '../utils/color_helper.dart';
 import '../utils/date_formatter.dart';
+import '../utils/upi_payment_service.dart';
+import '../models/upi_payment_result.dart';
+import '../models/upi_qr_prefill.dart';
 import 'package:intl/intl.dart';
 
 class AddTransactionScreen extends StatefulWidget {
@@ -34,6 +38,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   bool _isRecurring = false;
   String _recurringType = 'monthly';
 
+  bool _isPayingViaUpi = false;
+  String? _qrVpa;
+  String? _qrPayeeName;
+
   TransactionRecord? _editingTransaction;
   bool _isInit = true;
 
@@ -57,11 +65,33 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         _date = _editingTransaction!.date;
         _isRecurring = _editingTransaction!.isRecurring;
         _recurringType = _editingTransaction!.recurringType ?? 'monthly';
+      } else if (args != null && args is UpiQrPrefill) {
+        final accProvider = context.read<AccountProvider>();
+        final catProvider = context.read<CategoryProvider>();
+
+        _type = 'expense';
+        _qrVpa = args.vpa;
+        _qrPayeeName = args.payeeName;
+        if (args.amount != null) _amountController.text = args.amount!.toStringAsFixed(2);
+        if (args.note != null) _noteController.text = args.note!;
+
+        // Prefer a UPI-type account so the Pay button shows right away; fall
+        // back to whatever account exists so the user can still save it as a
+        // plain manual expense if they have none.
+        final upiAccounts = accProvider.accounts.where((a) => a.type == 'upi').toList();
+        if (upiAccounts.isNotEmpty) {
+          _selectedAccountId = upiAccounts.first.id;
+        } else if (accProvider.accounts.isNotEmpty) {
+          _selectedAccountId = accProvider.accounts.first.id;
+        }
+        if (catProvider.expenseCategories.isNotEmpty) {
+          _selectedCategoryId = catProvider.expenseCategories.first.id;
+        }
       } else {
         // Set defaults if accounts/categories exist
         final accProvider = context.read<AccountProvider>();
         final catProvider = context.read<CategoryProvider>();
-        
+
         if (accProvider.accounts.isNotEmpty) {
           _selectedAccountId = accProvider.accounts.first.id;
         }
@@ -167,6 +197,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               if (_type != 'transfer') _buildCategorySelector(),
               if (_type != 'transfer') const SizedBox(height: 24),
               _buildAccountSelector(),
+              _buildUpiPayButton(),
               const SizedBox(height: 24),
               _buildDateSelector(),
               const SizedBox(height: 24),
@@ -260,7 +291,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               runSpacing: 8,
               children: categories.map((cat) {
                 final isSelected = _selectedCategoryId == cat.id;
-                final catColor = Color(int.parse(cat.color.replaceFirst('#', '0xFF')));
+                final catColor = ColorHelper.hexToColor(cat.color);
                 return ChoiceChip(
                   label: Text(cat.name),
                   selected: isSelected,
@@ -423,5 +454,165 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           ),
       ],
     );
+  }
+
+  bool _selectedAccountIsUpi() {
+    if (_selectedAccountId == null) return false;
+    final accounts = context.read<AccountProvider>().accounts;
+    for (final acc in accounts) {
+      if (acc.id == _selectedAccountId) return acc.type == 'upi';
+    }
+    return false;
+  }
+
+  Widget _buildUpiPayButton() {
+    // Only offered for expenses paid out of a UPI account - editing an
+    // existing transaction never re-triggers a live payment.
+    if (_type != 'expense' || _editingTransaction != null || !_selectedAccountIsUpi()) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_qrVpa != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                'Paying $_qrPayeeName ($_qrVpa)',
+                style: const TextStyle(fontStyle: FontStyle.italic),
+              ),
+            ),
+          OutlinedButton.icon(
+            onPressed: _isPayingViaUpi ? null : _payViaUpi,
+            icon: _isPayingViaUpi
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.qr_code_scanner),
+            label: Text(_isPayingViaUpi ? 'Waiting for UPI app...' : 'Pay via UPI'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<({String vpa, String name})?> _askPayeeDetails() {
+    final vpaController = TextEditingController();
+    final nameController = TextEditingController();
+    return showDialog<({String vpa, String name})>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Pay via UPI'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: vpaController,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'Payee VPA (e.g. name@bank)'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: 'Payee Name'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final vpa = vpaController.text.trim();
+              final name = nameController.text.trim();
+              if (vpa.isEmpty || !vpa.contains('@') || name.isEmpty) {
+                ScaffoldMessenger.of(dialogCtx).showSnackBar(
+                  const SnackBar(content: Text('Enter a valid VPA and payee name')),
+                );
+                return;
+              }
+              Navigator.of(dialogCtx).pop((vpa: vpa, name: name));
+            },
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _payViaUpi() async {
+    final amount = double.tryParse(_amountController.text) ?? 0.0;
+    if (amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter an amount first')));
+      return;
+    }
+    if (_selectedCategoryId == null || _selectedAccountId == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Select a category and account first')));
+      return;
+    }
+
+    final payee = (_qrVpa != null && _qrPayeeName != null)
+        ? (vpa: _qrVpa!, name: _qrPayeeName!)
+        : await _askPayeeDetails();
+    if (payee == null) return;
+
+    setState(() => _isPayingViaUpi = true);
+    try {
+      // The UPI app handoff can take the app to the background for the
+      // whole duration of this call - the loading state above must stay up
+      // until it resolves, since the callback (or lack of one) only arrives
+      // when the user returns to this app.
+      final result = await UpiPaymentService.instance.payViaUpi(
+        payeeVpa: payee.vpa,
+        payeeName: payee.name,
+        amount: amount,
+        note: _noteController.text.trim(),
+        accountId: _selectedAccountId!,
+        categoryId: _selectedCategoryId!,
+      );
+
+      if (!mounted) return;
+
+      switch (result.status) {
+        case UpiPaymentStatus.success:
+          // Already written to the DB inside the service - just refresh and
+          // leave. Calling txProvider.addTransaction here would double-log it.
+          await context.read<TransactionProvider>().loadTransactions();
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('Payment successful, logged.')));
+          Navigator.of(context).pop();
+          break;
+        case UpiPaymentStatus.failure:
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('Payment failed.')));
+          break;
+        case UpiPaymentStatus.cancelled:
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('Payment cancelled.')));
+          break;
+        case UpiPaymentStatus.pending:
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(
+              "Couldn't confirm the payment status. It'll be logged automatically "
+              "once the ${payee.name} notification arrives - add it manually if it never does.",
+            ),
+            duration: const Duration(seconds: 6),
+          ));
+          break;
+      }
+    } on UpiAppNotFoundException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('No UPI app found on this device.')));
+    } finally {
+      if (mounted) setState(() => _isPayingViaUpi = false);
+    }
   }
 }

@@ -11,6 +11,8 @@ class TransactionRecord {
   final DateTime createdAt;
   final bool isRecurring;
   final String? recurringType; // 'daily', 'weekly', 'monthly', 'yearly'
+  final String? txnId; // UPI transaction ID (from PSP callback)
+  final String? txnRef; // UPI transaction ref / approval ref number
 
   const TransactionRecord({
     this.id,
@@ -25,6 +27,8 @@ class TransactionRecord {
     required this.createdAt,
     this.isRecurring = false,
     this.recurringType,
+    this.txnId,
+    this.txnRef,
   });
 
   Map<String, dynamic> toMap() {
@@ -41,6 +45,8 @@ class TransactionRecord {
       'created_at': createdAt.toIso8601String(),
       'is_recurring': isRecurring ? 1 : 0,
       'recurring_type': recurringType,
+      'txn_id': txnId,
+      'txn_ref': txnRef,
     };
   }
 
@@ -58,6 +64,8 @@ class TransactionRecord {
       createdAt: DateTime.parse(map['created_at'] as String),
       isRecurring: (map['is_recurring'] as int) == 1,
       recurringType: map['recurring_type'] as String?,
+      txnId: map['txn_id'] as String?,
+      txnRef: map['txn_ref'] as String?,
     );
   }
 
@@ -74,6 +82,8 @@ class TransactionRecord {
     DateTime? createdAt,
     bool? isRecurring,
     String? recurringType,
+    String? txnId,
+    String? txnRef,
   }) {
     return TransactionRecord(
       id: id ?? this.id,
@@ -88,6 +98,8 @@ class TransactionRecord {
       createdAt: createdAt ?? this.createdAt,
       isRecurring: isRecurring ?? this.isRecurring,
       recurringType: recurringType ?? this.recurringType,
+      txnId: txnId ?? this.txnId,
+      txnRef: txnRef ?? this.txnRef,
     );
   }
 
@@ -99,7 +111,7 @@ class TransactionRecord {
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is TransactionRecord && other.id == id;
+    return other is TransactionRecord && id != null && other.id == id;
   }
 
   @override

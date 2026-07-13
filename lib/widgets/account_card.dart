@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/account.dart';
 import '../utils/currency_formatter.dart';
 import '../utils/icon_helper.dart';
+import '../utils/color_helper.dart';
 
 class AccountCard extends StatelessWidget {
   final Account account;
@@ -17,7 +18,7 @@ class AccountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color accountColor = Color(int.parse(account.color.replaceFirst('#', '0xFF')));
+    Color accountColor = ColorHelper.hexToColor(account.color);
     IconData iconData = IconHelper.getIconForAccountType(account.type);
 
     return GestureDetector(

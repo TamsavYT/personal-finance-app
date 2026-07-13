@@ -97,7 +97,7 @@ class RecurringTransaction {
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is RecurringTransaction && other.id == id;
+    return other is RecurringTransaction && id != null && other.id == id;
   }
 
   @override
