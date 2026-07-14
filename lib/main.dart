@@ -16,7 +16,7 @@ import 'screens/add_transaction_screen.dart';
 import 'screens/analytics_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/recurring_transactions_screen.dart';
-import 'screens/lock_screen.dart' show AuthWrapper, LockScreen;
+import 'screens/lock_screen.dart' show AuthWrapper;
 import 'package:home_widget/home_widget.dart';
 import 'utils/notification_service.dart';
 void main() async {

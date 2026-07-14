@@ -102,7 +102,7 @@ class _QrScanScreenState extends State<QrScanScreen> {
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
-                shadows: [Shadow(blurRadius: 8, color: Colors.black.withOpacity(0.8))],
+                shadows: [Shadow(blurRadius: 8, color: Colors.black.withValues(alpha: 0.8))],
               ),
             ),
           ),

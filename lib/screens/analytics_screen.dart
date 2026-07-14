@@ -5,7 +5,6 @@ import '../utils/currency_formatter.dart';
 import '../utils/date_formatter.dart';
 import '../utils/color_helper.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../utils/icon_helper.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -133,9 +132,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
@@ -309,8 +308,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               final percentage = (budget['percentage'] as num).toDouble();
               
               Color progressColor = Colors.green;
-              if (percentage > 90) progressColor = Colors.red;
-              else if (percentage > 70) progressColor = Colors.orange;
+              if (percentage > 90) {
+                progressColor = Colors.red;
+              } else if (percentage > 70) {
+                progressColor = Colors.orange;
+              }
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 16.0),

@@ -6,7 +6,6 @@ import '../providers/category_provider.dart';
 import '../providers/account_provider.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
-import '../models/account.dart';
 import '../utils/icon_helper.dart';
 import '../utils/color_helper.dart';
 import '../utils/date_formatter.dart';
@@ -296,7 +295,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 return ChoiceChip(
                   label: Text(cat.name),
                   selected: isSelected,
-                  selectedColor: catColor.withOpacity(0.2),
+                  selectedColor: catColor.withValues(alpha: 0.2),
                   avatar: Icon(IconHelper.getIconFromCodePoint(int.parse(cat.icon)), size: 18, color: catColor),
                   onSelected: (selected) {
                     if (selected) {
@@ -325,7 +324,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             const Text('Account', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 8),
             DropdownButtonFormField<int>(
-              value: _selectedAccountId,
+              initialValue: _selectedAccountId,
               decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
               items: accProvider.accounts.map((acc) {
                 return DropdownMenuItem<int>(
@@ -338,27 +337,27 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             if (_type == 'transfer') ...[
               const SizedBox(height: 16),
               const Text('Destination', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              Row(
-                children: [
-                  Expanded(
-                    child: RadioListTile<bool>(
-                      title: const Text('To Account', style: TextStyle(fontSize: 14)),
-                      value: false,
-                      groupValue: _isTransferToFriend,
-                      onChanged: (val) => setState(() => _isTransferToFriend = val!),
-                      contentPadding: EdgeInsets.zero,
+              RadioGroup<bool>(
+                groupValue: _isTransferToFriend,
+                onChanged: (val) => setState(() => _isTransferToFriend = val!),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: RadioListTile<bool>(
+                        title: const Text('To Account', style: TextStyle(fontSize: 14)),
+                        value: false,
+                        contentPadding: EdgeInsets.zero,
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: RadioListTile<bool>(
-                      title: const Text('To Friend', style: TextStyle(fontSize: 14)),
-                      value: true,
-                      groupValue: _isTransferToFriend,
-                      onChanged: (val) => setState(() => _isTransferToFriend = val!),
-                      contentPadding: EdgeInsets.zero,
+                    Expanded(
+                      child: RadioListTile<bool>(
+                        title: const Text('To Friend', style: TextStyle(fontSize: 14)),
+                        value: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               const SizedBox(height: 8),
               if (_isTransferToFriend)
@@ -379,7 +378,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 )
               else
                 DropdownButtonFormField<int>(
-                  value: _selectedToAccountId,
+                  initialValue: _selectedToAccountId,
                   decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
                   items: accProvider.accounts.map((acc) {
                     return DropdownMenuItem<int>(
@@ -439,7 +438,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         ),
         if (_isRecurring)
           DropdownButtonFormField<String>(
-            value: _recurringType,
+            initialValue: _recurringType,
             decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
             items: ['daily', 'weekly', 'monthly', 'yearly'].map((String type) {
               return DropdownMenuItem<String>(
@@ -586,6 +585,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           // Already written to the DB inside the service - just refresh and
           // leave. Calling txProvider.addTransaction here would double-log it.
           await context.read<TransactionProvider>().loadTransactions();
+          if (!mounted) return;
           ScaffoldMessenger.of(context)
               .showSnackBar(const SnackBar(content: Text('Payment successful, logged.')));
           Navigator.of(context).pop();

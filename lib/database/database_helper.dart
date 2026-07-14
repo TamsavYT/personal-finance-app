@@ -180,8 +180,6 @@ class DatabaseHelper {
   }
 
   Future<void> _seedDefaultCategories(Database db) async {
-    final now = DateTime.now().toIso8601String();
-
     // Income categories
     final incomeCategories = [
       {'name': 'Salary', 'type': 'income', 'icon': '0xe227', 'color': '#4CAF50', 'is_default': 1, 'is_active': 1},

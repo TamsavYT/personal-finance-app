@@ -28,7 +28,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // Load data after the first frame
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await context.read<AccountProvider>().loadAccounts();
+      if (!mounted) return;
       await context.read<CategoryProvider>().loadCategories();
+      if (!mounted) return;
       await context.read<TransactionProvider>().loadTransactions();
       if (mounted) _refreshBalances();
     });
@@ -48,7 +50,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _onRefresh() async {
     await context.read<AccountProvider>().loadAccounts();
+    if (!mounted) return;
     await context.read<CategoryProvider>().loadCategories();
+    if (!mounted) return;
     await context.read<TransactionProvider>().loadTransactions();
     _refreshBalances();
   }

@@ -71,15 +71,15 @@ class NotificationService {
     final enabled = await isAutoTrackingEnabled;
     if (!enabled) return;
 
-    final packageName = event.packageName ?? '';
+    final packageName = event.packageName;
     
     // Check if it's from a payment app
     if (packageName == 'com.google.android.apps.nbu.paisa.user' ||
         packageName == 'net.one97.paytm' ||
         packageName == 'com.phonepe.app') {
           
-      final title = event.title ?? '';
-      final content = event.content ?? '';
+      final title = event.title;
+      final content = event.content;
       
       // Combine title and content to parse
       final textToParse = '$title $content';
