@@ -130,7 +130,7 @@ class _RecurringTransactionsScreenState
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     DropdownButtonFormField<String>(
-                      value: type,
+                      initialValue: type,
                       items: ['income', 'expense']
                           .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                           .toList(),
@@ -141,7 +141,7 @@ class _RecurringTransactionsScreenState
                       decoration: const InputDecoration(labelText: 'Type'),
                     ),
                     DropdownButtonFormField<int>(
-                      value: categoryId,
+                      initialValue: categoryId,
                       items: categories
                           .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
                           .toList(),
@@ -149,7 +149,7 @@ class _RecurringTransactionsScreenState
                       decoration: const InputDecoration(labelText: 'Category'),
                     ),
                     DropdownButtonFormField<int>(
-                      value: accountId,
+                      initialValue: accountId,
                       items: accProvider.accounts
                           .map((a) => DropdownMenuItem(value: a.id, child: Text(a.name)))
                           .toList(),
@@ -162,7 +162,7 @@ class _RecurringTransactionsScreenState
                       keyboardType: TextInputType.number,
                     ),
                     DropdownButtonFormField<String>(
-                      value: frequency,
+                      initialValue: frequency,
                       items: ['daily', 'weekly', 'monthly', 'yearly']
                           .map((f) => DropdownMenuItem(value: f, child: Text(f)))
                           .toList(),

@@ -71,7 +71,7 @@ class TransactionTile extends StatelessWidget {
       onTap: onTap,
       onLongPress: onLongPress,
       leading: CircleAvatar(
-        backgroundColor: iconColor.withOpacity(0.2),
+        backgroundColor: iconColor.withValues(alpha: 0.2),
         child: Icon(iconData, color: iconColor),
       ),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),

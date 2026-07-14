@@ -143,7 +143,7 @@ class ExportHelper {
                   txn.type.toUpperCase(),
                   categoryMap[txn.categoryId] ?? '-',
                   accountMap[txn.accountId] ?? '-',
-                  '${txn.amount.toStringAsFixed(2)}',
+                  txn.amount.toStringAsFixed(2),
                   txn.note ?? '-',
                 ];
               }).toList(),

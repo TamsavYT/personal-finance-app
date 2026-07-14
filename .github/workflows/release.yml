@@ -36,7 +36,7 @@ jobs:
         run: flutter analyze
 
       - name: Build release APK
-        run: flutter build apk --release
+        run: flutter build apk --release --no-tree-shake-icons
 
       - name: Resolve version
         id: version

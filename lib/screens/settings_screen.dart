@@ -70,6 +70,7 @@ class SettingsScreen extends StatelessWidget {
                       if (value == 'clear') {
                         final txProvider = context.read<TransactionProvider>();
                         await txProvider.clearTransactionsForAccount(acc.id!);
+                        if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text('Transactions cleared for ${acc.name}')),
                         );
@@ -114,7 +115,7 @@ class SettingsScreen extends StatelessWidget {
                 decoration: const InputDecoration(labelText: 'Account Name'),
               ),
               DropdownButtonFormField<String>(
-                value: type,
+                initialValue: type,
                 items: ['cash', 'bank', 'upi', 'wallet', 'other']
                     .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                     .toList(),
@@ -204,7 +205,7 @@ class SettingsScreen extends StatelessWidget {
                 decoration: const InputDecoration(labelText: 'Category Name'),
               ),
               DropdownButtonFormField<String>(
-                value: type,
+                initialValue: type,
                 items: ['income', 'expense']
                     .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                     .toList(),
@@ -291,7 +292,7 @@ class SettingsScreen extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<int>(
-                value: categoryId,
+                initialValue: categoryId,
                 items: catProvider.expenseCategories
                     .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
                     .toList(),
@@ -442,13 +443,13 @@ class SettingsScreen extends StatelessWidget {
               );
               if (context.mounted) {
                 final box = context.findRenderObject() as RenderBox?;
-                await Share.shareXFiles(
-                  [XFile(path)],
+                await SharePlus.instance.share(ShareParams(
+                  files: [XFile(path)],
                   text: 'Expense Ledger CSV Export',
                   sharePositionOrigin: box != null
                       ? box.localToGlobal(Offset.zero) & box.size
                       : null,
-                );
+                ));
               }
             } catch (e) {
               if (context.mounted) {
@@ -475,13 +476,13 @@ class SettingsScreen extends StatelessWidget {
               );
               if (context.mounted) {
                 final box = context.findRenderObject() as RenderBox?;
-                await Share.shareXFiles(
-                  [XFile(path)],
+                await SharePlus.instance.share(ShareParams(
+                  files: [XFile(path)],
                   text: 'Expense Ledger PDF Report',
                   sharePositionOrigin: box != null
                       ? box.localToGlobal(Offset.zero) & box.size
                       : null,
-                );
+                ));
               }
             } catch (e) {
               if (context.mounted) {
